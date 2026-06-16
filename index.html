@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GigaNet Account Checker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #38bdf8;
+    --green: #86efac;
+    --green-bg: #14532d;
+    --yellow: #fcd34d;
+    --yellow-bg: #78350f;
+    --red: #fca5a5;
+    --red-bg: #7f1d1d;
+    --purple: #d8b4fe;
+    --purple-bg: #3b0764;
+    --blue: #7dd3fc;
+    --blue-bg: #0c2340;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px 16px 40px;
+  }
+
+  /* HEADER */
+  .header { text-align: center; margin-bottom: 24px; }
+  .header h1 { font-size: 1.6rem; color: var(--accent); letter-spacing: 1px; margin-bottom: 4px; }
+  .header p { font-size: 0.8rem; color: var(--muted); }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .topbar-left { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+
+  /* SORT BUTTONS */
+  .sort-group {
+    display: flex;
+    gap: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+  }
+  .sort-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .sort-btn.active { background: var(--blue-bg); color: var(--blue); }
+  .sort-btn .arrow { font-size: 0.65rem; margin-left: 2px; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.83rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background: #0369a1; color: white; }
+  .btn-primary:hover:not(:disabled) { background: #0284c7; }
+  .btn-success { background: var(--green-bg); color: var(--green); border: 1px solid #166534; }
+  .btn-danger  { background: var(--red-bg); color: var(--red); }
+  .btn-ghost   { background: var(--blue-bg); color: var(--blue); border: 1px solid #1e3a5f; }
+
+  /* SUMMARY CARDS */
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .sum-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .sum-val { font-size: 1.4rem; font-weight: 800; }
+  .sum-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+  .sum-green  { color: var(--green); }
+  .sum-yellow { color: var(--yellow); }
+  .sum-red    { color: var(--red); }
+  .sum-blue   { color: var(--blue); }
+
+  /* TABLE WRAPPER */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 700px; }
+  thead { background: #131f35; }
+  th {
+    padding: 11px 14px;
+    text-align: left;
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th:hover { color: var(--accent); }
+  th.sorted { color: var(--accent); }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #1a2744;
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(56,189,248,0.03); }
+
+  /* ROW STATES */
+  tr.row-expired td:first-child { border-left: 3px solid var(--red); }
+  tr.row-expiring td:first-child { border-left: 3px solid var(--yellow); }
+  tr.row-active td:first-child { border-left: 3px solid var(--green); }
+  tr.row-loading td:first-child { border-left: 3px solid var(--border); }
+
+  /* BADGE */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .badge-ok       { background: var(--green-bg);  color: var(--green); }
+  .badge-expired  { background: var(--red-bg);    color: var(--red); }
+  .badge-expiring { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-checking { background: var(--blue-bg);   color: var(--blue); }
+  .badge-error    { background: var(--purple-bg); color: var(--purple); }
+
+  /* PROGRESS BAR */
+  .pbar-wrap { min-width: 120px; }
+  .pbar-top { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+  .pbar-bg { background: var(--border); border-radius: 3px; height: 6px; overflow: hidden; }
+  .pbar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+  /* SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 2px solid var(--blue);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ACTIONS */
+  .row-actions { display: flex; gap: 6px; }
+  .action-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .action-btn.del:hover { border-color: var(--red); color: var(--red); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .modal h3 { font-size: 1rem; margin-bottom: 16px; color: var(--accent); }
+  .modal label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 4px; }
+  .modal input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    outline: none;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; margin-top: 4px; }
+  .modal-btns .btn { flex: 1; padding: 10px; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--green-bg);
+    color: var(--green);
+    border: 1px solid #166534;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: 999;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  .last-checked { font-size: 0.73rem; color: var(--muted); text-align: right; margin-top: 8px; }
+  .empty-row td { text-align: center; color: var(--muted); padding: 40px; }
+
+  @media (max-width: 500px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🌐 GigaNet Checker</h1>
+  <p>All accounts at a glance</p>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="sort-group">
+      <span style="font-size:0.72rem;color:var(--muted);padding:5px 6px;align-self:center">Sort:</span>
+      <button class="sort-btn active" id="sort-name" onclick="setSort('name')">Name <span class="arrow" id="arr-name">↑</span></button>
+      <button class="sort-btn" id="sort-expiry" onclick="setSort('expiry')">Expiry <span class="arrow" id="arr-expiry">↑</span></button>
+      <button class="sort-btn" id="sort-traffic" onclick="setSort('traffic')">Traffic <span class="arrow" id="arr-traffic">↑</span></button>
+    </div>
+  </div>
+  <button class="btn btn-primary" id="checkBtn" onclick="checkAll()">🔍 Refresh All</button>
+  <button class="btn btn-ghost" onclick="openAddModal()">+ Add Account</button>
+</div>
+
+<!-- SUMMARY -->
+<div class="summary">
+  <div class="sum-card"><div class="sum-val sum-green" id="s-active">—</div><div class="sum-label">Active</div></div>
+  <div class="sum-card"><div class="sum-val sum-yellow" id="s-expiring">—</div><div class="sum-label">Expiring Soon</div></div>
+  <div class="sum-card"><div class="sum-val sum-red" id="s-expired">—</div><div class="sum-label">Expired</div></div>
+  <div class="sum-card"><div class="sum-val sum-blue" id="s-total">—</div><div class="sum-label">Total</div></div>
+</div>
+
+<!-- TABLE -->
+<div class="table-wrap">
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="setSort('name')">Account</th>
+          <th onclick="setSort('expiry')">Expiry Date</th>
+          <th onclick="setSort('expiry')">Days Left</th>
+          <th onclick="setSort('traffic')">Traffic Used</th>
+          <th>Remaining</th>
+          <th>Plan</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr class="row-loading"><td colspan="8" style="text-align:center;color:var(--muted);padding:40px">
+          <span class="spinner"></span> Loading accounts...
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="last-checked" style="padding:8px 14px" id="last-checked"></div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Add Account</h3>
+    <label>Label (optional)</label>
+    <input type="text" id="m-label" placeholder="e.g. Home, Office, TVC" />
+    <label>Username</label>
+    <input type="text" id="m-user" placeholder="GigaNet username" autocomplete="off" spellcheck="false" />
+    <label>Password</label>
+    <input type="password" id="m-pass" placeholder="GigaNet password" autocomplete="off" />
+    <div class="modal-btns">
+      <button class="btn btn-danger" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" id="modal-save-btn" onclick="saveAccount()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://xhfenawfbcxixtjlbvlc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoZmVuYXdmYmN4aXh0amxidmxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzIxMzYsImV4cCI6MjA5NzIwODEzNn0.UplccqwXC-yLfC8QUYUEuxoRsot1gdX8KFOJnAcHxKg';
+const GIGANET     = 'http://user.giganetlb.net/user/api/index.php/api';
+const AES_KEY     = 'abcdefghijuklmno0123456789012345';
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let accounts = [];
+let results  = {};   // id -> result data
+let sortKey  = 'name';
+let sortAsc  = true;
+let editingId = null;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadAccounts();
+  renderTable();
+  if (accounts.length > 0) checkAll();
+}
+
+// ── LOAD ACCOUNTS ─────────────────────────────────────────────────────────────
+async function loadAccounts() {
+  const { data, error } = await db.from('giganet_accounts').select('*').order('created_at');
+  if (!error && data) accounts = data;
+}
+
+// ── SORT ──────────────────────────────────────────────────────────────────────
+function setSort(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  ['name','expiry','traffic'].forEach(k => {
+    document.getElementById('sort-' + k).classList.remove('active');
+    document.getElementById('arr-' + k).textContent = '↑';
+  });
+  document.getElementById('sort-' + key).classList.add('active');
+  document.getElementById('arr-' + key).textContent = sortAsc ? '↑' : '↓';
+  renderTable();
+}
+
+function sortedAccounts() {
+  return [...accounts].sort((a, b) => {
+    let av, bv;
+    if (sortKey === 'name') {
+      av = (a.label || a.username).toLowerCase();
+      bv = (b.label || b.username).toLowerCase();
+    } else if (sortKey === 'expiry') {
+      const ra = results[a.id], rb = results[b.id];
+      av = ra?.daysLeft ?? 99999;
+      bv = rb?.daysLeft ?? 99999;
+    } else if (sortKey === 'traffic') {
+      const ra = results[a.id], rb = results[b.id];
+      av = ra?.pct ?? -1;
+      bv = rb?.pct ?? -1;
+    }
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ? 1 : -1;
+    return 0;
+  });
+}
+
+// ── RENDER TABLE ──────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  if (accounts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-row" style="text-align:center;color:var(--muted);padding:40px">
+      No accounts yet. Click <strong style="color:var(--blue)">+ Add Account</strong> to get started.
+    </td></tr>`;
+    updateSummary();
+    return;
+  }
+
+  tbody.innerHTML = sortedAccounts().map(acc => {
+    const r = results[acc.id];
+    if (!r) return loadingRow(acc);
+    if (r.error) return errorRow(acc, r.error);
+    return dataRow(acc, r);
+  }).join('');
+
+  updateSummary();
+}
+
+function loadingRow(acc) {
+  return `<tr class="row-loading" id="row-${acc.id}">
+    <td><strong>${esc(acc.label || acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
+    <td colspan="5"><span class="spinner"></span> <span style="color:var(--muted);font-size:0.8rem">Checking...</span></td>
+    <td><span class="badge badge-checking">Loading</span></td>
+    <td>${actionBtns(acc)}</td>
+  </tr>`;
+}
+
+function errorRow(acc, err) {
+  return `<tr id="row-${acc.id}">
+    <td><strong>${esc(acc.label || acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
+    <td colspan="5" style="color:var(--purple);font-size:0.78rem">${esc(err)}</td>
+    <td><span class="badge badge-error">✕ Error</span></td>
+    <td>${actionBtns(acc)}</td>
+  </tr>`;
+}
+
+function dataRow(acc, r) {
+  const rowClass = r.daysLeft == null ? '' : r.daysLeft < 0 ? 'row-expired' : r.daysLeft <= 7 ? 'row-expiring' : 'row-active';
+  const daysColor = r.daysLeft == null ? 'var(--blue)' : r.daysLeft < 0 ? 'var(--red)' : r.daysLeft <= 7 ? 'var(--yellow)' : 'var(--green)';
+  const daysText  = r.daysLeft == null ? '—' : r.daysLeft < 0 ? Math.abs(r.daysLeft) + 'd overdue' : r.daysLeft + ' days';
+  const barColor  = r.pct > 85 ? 'var(--red)' : r.pct > 60 ? 'var(--yellow)' : 'var(--green)';
+  const remGB     = r.maxGB ? Math.max(0, r.maxGB - r.usedGB).toFixed(1) + ' GB' : '—';
+
+  let badge = '';
+  if (r.daysLeft == null)    badge = `<span class="badge badge-ok">✓ Active</span>`;
+  else if (r.daysLeft < 0)   badge = `<span class="badge badge-expired">✕ Expired</span>`;
+  else if (r.daysLeft <= 7)  badge = `<span class="badge badge-expiring">⚠️ Soon</span>`;
+  else                        badge = `<span class="badge badge-ok">✓ Active</span>`;
+
+  return `<tr class="${rowClass}" id="row-${acc.id}">
+    <td>
+      <strong>${esc(acc.label || acc.username)}</strong><br>
+      <small style="color:var(--muted)">${esc(acc.username)}</small>
+    </td>
+    <td style="color:${daysColor};font-weight:600">${r.expFormatted}</td>
+    <td style="color:${daysColor};font-weight:700">${daysText}</td>
+    <td>
+      <div class="pbar-wrap">
+        <div class="pbar-top">
+          <span>${r.usedGB} GB</span>
+          <span>${r.maxGB ? r.maxGB + ' GB' : '—'}</span>
+        </div>
+        <div class="pbar-bg">
+          <div class="pbar-fill" style="width:${r.pct}%;background:${barColor}"></div>
+        </div>
+      </div>
+    </td>
+    <td style="color:var(--green);font-weight:600">${remGB}</td>
+    <td style="font-size:0.75rem;color:var(--muted);max-width:150px">${esc(r.profileName)}</td>
+    <td>${badge}</td>
+    <td>${actionBtns(acc)}</td>
+  </tr>`;
+}
+
+function actionBtns(acc) {
+  return `<div class="row-actions">
+    <button class="action-btn" onclick='openEditModal(${JSON.stringify(acc).replace(/'/g,"&#39;")})'>✏️</button>
+    <button class="action-btn del" onclick="deleteAccount('${acc.id}')">🗑️</button>
+  </div>`;
+}
+
+// ── SUMMARY ───────────────────────────────────────────────────────────────────
+function updateSummary() {
+  const done = Object.values(results).filter(r => !r.loading);
+  const active   = done.filter(r => !r.error && (r.daysLeft == null || r.daysLeft > 7)).length;
+  const expiring = done.filter(r => !r.error && r.daysLeft != null && r.daysLeft >= 0 && r.daysLeft <= 7).length;
+  const expired  = done.filter(r => !r.error && r.daysLeft != null && r.daysLeft < 0).length;
+  document.getElementById('s-active').textContent   = active;
+  document.getElementById('s-expiring').textContent = expiring;
+  document.getElementById('s-expired').textContent  = expired;
+  document.getElementById('s-total').textContent    = accounts.length;
+}
+
+// ── CHECK ALL ─────────────────────────────────────────────────────────────────
+async function checkAll() {
+  if (accounts.length === 0) return;
+  const btn = document.getElementById('checkBtn');
+  btn.disabled = true; btn.textContent = '⏳ Refreshing...';
+  results = {};
+  renderTable();
+  await Promise.all(accounts.map(acc => checkAccount(acc)));
+  renderTable();
+  btn.disabled = false; btn.textContent = '🔍 Refresh All';
+  document.getElementById('last-checked').textContent =
+    'Last updated: ' + new Date().toLocaleTimeString('en-GB');
+}
+
+async function checkAccount(acc) {
+  try {
+    const encrypted = CryptoJS.AES.encrypt(
+      JSON.stringify({ username: acc.username, password: acc.password }),
+      AES_KEY
+    ).toString();
+
+    const loginRes = await fetch(`${GIGANET}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: encrypted })
+    });
+    if (!loginRes.ok) throw new Error('Login failed (' + loginRes.status + ')');
+    const loginData = await loginRes.json();
+    const token = loginData.token;
+    if (!token) throw new Error('Wrong username or password');
+
+    const svcRes = await fetch(`${GIGANET}/service`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!svcRes.ok) throw new Error('Service fetch failed');
+    const svc = (await svcRes.json()).data || {};
+
+    const expiration  = svc.expiration || null;
+    const profileName = svc.profile_name || '—';
+    const trafficUsed = svc.limits?.rxtx_bytes || 0;
+    const trafficMax  = svc.traffic_limit || 0;
+
+    let daysLeft = null, expFormatted = '—';
+    if (expiration) {
+      const expDate = new Date(expiration);
+      daysLeft = Math.ceil((expDate - new Date()) / 86400000);
+      expFormatted = expDate.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    }
+
+    const usedGB = parseFloat((trafficUsed / 1073741824).toFixed(2));
+    const maxGB  = trafficMax ? parseFloat((trafficMax  / 1073741824).toFixed(0)) : null;
+    const pct    = maxGB ? Math.min(100, Math.round(usedGB / maxGB * 100)) : 0;
+
+    results[acc.id] = { daysLeft, expFormatted, profileName, usedGB, maxGB, pct };
+  } catch(err) {
+    results[acc.id] = { error: err.message };
+  }
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+async function saveAccount() {
+  const label    = document.getElementById('m-label').value.trim();
+  const username = document.getElementById('m-user').value.trim();
+  const password = document.getElementById('m-pass').value.trim();
+  if (!username || !password) { showToast('⚠️ Username and password required', true); return; }
+
+  const btn = document.getElementById('modal-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  if (editingId) {
+    await db.from('giganet_accounts').update({ label, username, password }).eq('id', editingId);
+    showToast('✅ Account updated');
+  } else {
+    await db.from('giganet_accounts').insert({ label, username, password });
+    showToast('✅ Account added');
+  }
+
+  btn.disabled = false; btn.textContent = '💾 Save';
+  closeModal();
+  await loadAccounts();
+  results = {};
+  renderTable();
+  checkAll();
+}
+
+async function deleteAccount(id) {
+  if (!confirm('Delete this account?')) return;
+  await db.from('giganet_accounts').delete().eq('id', id);
+  delete results[id];
+  await loadAccounts();
+  renderTable();
+  showToast('🗑️ Account deleted');
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Add Account';
+  document.getElementById('m-label').value = '';
+  document.getElementById('m-user').value  = '';
+  document.getElementById('m-pass').value  = '';
+  document.getElementById('modal').classList.add('open');
+}
+function openEditModal(acc) {
+  editingId = acc.id;
+  document.getElementById('modal-title').textContent = 'Edit Account';
+  document.getElementById('m-label').value = acc.label || '';
+  document.getElementById('m-user').value  = acc.username;
+  document.getElementById('m-pass').value  = acc.password;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  editingId = null;
+}
+document.getElementById('modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background   = isError ? 'var(--purple-bg)' : 'var(--green-bg)';
+  t.style.color        = isError ? 'var(--purple)'    : 'var(--green)';
+  t.style.borderColor  = isError ? '#6b21a8'          : '#166534';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
