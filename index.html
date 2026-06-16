@@ -368,6 +368,12 @@ async function showApp() {
   // Admin gets tabs, viewer only gets dashboard
   if (currentUser.role === 'admin') {
     document.getElementById('admin-tabs').style.display = 'flex';
+    document.getElementById('tab-accounts').innerHTML = document.getElementById('tab-accounts').innerHTML;
+    document.getElementById('tab-users').innerHTML = document.getElementById('tab-users').innerHTML;
+  } else {
+    // Completely remove admin-only sections from DOM for viewers
+    document.getElementById('tab-accounts').remove();
+    document.getElementById('tab-users').remove();
   }
 
   loadSettings();
