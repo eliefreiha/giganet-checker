@@ -172,6 +172,7 @@
     <h1>🌐 GigaNet Checker</h1>
     <div class="topnav-right">
       <span class="user-chip" id="user-chip">👤 User</span>
+      <button class="btn btn-ghost" style="padding:6px 12px;font-size:0.78rem" onclick="openChangePassModal()">🔑 Change Password</button>
       <button class="btn btn-danger" style="padding:6px 12px;font-size:0.78rem" onclick="doLogout()">Sign Out</button>
     </div>
   </div>
@@ -305,6 +306,24 @@
   </div>
 </div>
 
+<!-- Change Password Modal -->
+<div class="modal-overlay" id="modal-chpass">
+  <div class="modal">
+    <h3>🔑 Change Password</h3>
+    <label>Current Password</label>
+    <input type="password" id="cp-current" placeholder="Current password" autocomplete="off">
+    <label>New Password</label>
+    <input type="password" id="cp-new" placeholder="New password" autocomplete="off">
+    <label>Confirm New Password</label>
+    <input type="password" id="cp-confirm" placeholder="Confirm new password" autocomplete="off">
+    <div id="cp-error" style="color:var(--red);font-size:0.8rem;margin-bottom:8px;display:none"></div>
+    <div class="modal-btns">
+      <button class="btn btn-danger" onclick="closeModal('modal-chpass')">Cancel</button>
+      <button class="btn btn-success" id="cp-save-btn" onclick="changePassword()">💾 Update</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -376,6 +395,14 @@ async function showApp() {
   document.getElementById('tab-dashboard').style.display = 'block';
 
   loadSettings();
+  // Show empty table immediately to prevent flash
+  document.getElementById('table-body').innerHTML = 
+    '<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Loading...</td></tr>';
+  document.getElementById('s-active').textContent = '—';
+  document.getElementById('s-expiring').textContent = '—';
+  document.getElementById('s-expired').textContent = '—';
+  document.getElementById('s-total').textContent = '—';
+
   await loadAllAccounts();
   await loadVisibleAccounts();
   renderDashboard();
@@ -710,6 +737,47 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 });
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
+function openChangePassModal() {
+  document.getElementById('cp-current').value = '';
+  document.getElementById('cp-new').value = '';
+  document.getElementById('cp-confirm').value = '';
+  document.getElementById('cp-error').style.display = 'none';
+  openModal('modal-chpass');
+}
+
+async function changePassword() {
+  const current = document.getElementById('cp-current').value;
+  const newPass = document.getElementById('cp-new').value;
+  const confirm = document.getElementById('cp-confirm').value;
+  const errEl   = document.getElementById('cp-error');
+  errEl.style.display = 'none';
+
+  if (current !== currentUser.password) {
+    errEl.textContent = 'Current password is incorrect.'; errEl.style.display = 'block'; return;
+  }
+  if (!newPass || newPass.length < 4) {
+    errEl.textContent = 'New password must be at least 4 characters.'; errEl.style.display = 'block'; return;
+  }
+  if (newPass !== confirm) {
+    errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return;
+  }
+
+  const btn = document.getElementById('cp-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  const { error } = await db.from('app_users').update({ password: newPass }).eq('id', currentUser.id);
+  btn.disabled = false; btn.textContent = '💾 Update';
+
+  if (error) { errEl.textContent = 'Error updating password.'; errEl.style.display = 'block'; return; }
+  currentUser.password = newPass;
+  sessionStorage.setItem('giganet_user', JSON.stringify(currentUser));
+  closeModal('modal-chpass');
+  showToast('✅ Password updated successfully');
+}
+
+['modal-chpass'].forEach(id => {
+  document.getElementById(id)?.addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(id); });
+});
+
 function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function showToast(msg,isError=false){
   const t=document.getElementById('toast');
