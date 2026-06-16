@@ -371,11 +371,17 @@ function showLoginError(msg) {
 
 function doLogout() {
   sessionStorage.removeItem('giganet_user');
-  currentUser = null;
+  currentUser     = null;
+  allAccounts     = [];
+  visibleAccounts = [];
+  results         = {};
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('app-page').style.display   = 'none';
   document.getElementById('login-email').value = '';
   document.getElementById('login-pass').value  = '';
+  // Restore admin tabs in case viewer had removed them
+  const adminTabs = document.getElementById('admin-tabs');
+  if (adminTabs) adminTabs.style.display = 'none';
 }
 
 async function showApp() {
@@ -395,16 +401,25 @@ async function showApp() {
   document.getElementById('tab-dashboard').style.display = 'block';
 
   loadSettings();
-  // Show empty table immediately to prevent flash
-  document.getElementById('table-body').innerHTML = 
-    '<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Loading...</td></tr>';
-  document.getElementById('s-active').textContent = '—';
-  document.getElementById('s-expiring').textContent = '—';
-  document.getElementById('s-expired').textContent = '—';
-  document.getElementById('s-total').textContent = '—';
 
+  // Reset state completely on every login
+  allAccounts     = [];
+  visibleAccounts = [];
+  results         = {};
+
+  // Show spinner — nothing else until data is ready
+  document.getElementById('table-body').innerHTML =
+    '<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Loading your accounts...</td></tr>';
+  document.getElementById('s-active').textContent   = '—';
+  document.getElementById('s-expiring').textContent = '—';
+  document.getElementById('s-expired').textContent  = '—';
+  document.getElementById('s-total').textContent    = '—';
+
+  // Load ALL accounts first, then filter for this user
   await loadAllAccounts();
-  await loadVisibleAccounts();
+  await loadVisibleAccounts();  // sets visibleAccounts based on role
+
+  // Only NOW render and check
   renderDashboard();
   checkAll();
 
