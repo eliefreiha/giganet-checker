@@ -3,224 +3,305 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GigaNet Account Checker</title>
+<title>GigaNet Checker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
-    --bg: #0f172a; --card: #1e293b; --border: #334155;
-    --text: #e2e8f0; --muted: #64748b; --accent: #38bdf8;
-    --green: #86efac; --green-bg: #14532d;
-    --yellow: #fcd34d; --yellow-bg: #78350f;
-    --red: #fca5a5; --red-bg: #7f1d1d;
-    --purple: #d8b4fe; --purple-bg: #3b0764;
-    --blue: #7dd3fc; --blue-bg: #0c2340;
+    --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#64748b;
+    --accent:#38bdf8;--green:#86efac;--green-bg:#14532d;--yellow:#fcd34d;
+    --yellow-bg:#78350f;--red:#fca5a5;--red-bg:#7f1d1d;--purple:#d8b4fe;
+    --purple-bg:#3b0764;--blue:#7dd3fc;--blue-bg:#0c2340;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 20px 16px 40px; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
 
-  .header { text-align: center; margin-bottom: 20px; }
-  .header h1 { font-size: 1.6rem; color: var(--accent); letter-spacing: 1px; margin-bottom: 4px; }
-  .header p { font-size: 0.8rem; color: var(--muted); }
+  /* LOGIN */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 32px;width:100%;max-width:380px;}
+  .login-box h1{font-size:1.5rem;color:var(--accent);text-align:center;margin-bottom:4px;}
+  .login-box p{text-align:center;color:var(--muted);font-size:0.82rem;margin-bottom:28px;}
+  .form-group{margin-bottom:16px;}
+  .form-group label{display:block;font-size:0.75rem;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.4px;}
+  .form-group input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--text);font-size:0.92rem;outline:none;transition:border-color 0.2s;}
+  .form-group input:focus{border-color:var(--accent);}
+  .login-error{background:var(--red-bg);color:var(--red);border-radius:8px;padding:10px 14px;font-size:0.82rem;margin-bottom:16px;display:none;}
 
-  .topbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-  .topbar-left { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  /* APP */
+  .app-wrap{display:none;padding:20px 16px 40px;}
+  .topnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+  .topnav h1{font-size:1.3rem;color:var(--accent);}
+  .topnav-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .user-chip{background:var(--blue-bg);color:var(--blue);border:1px solid #1e3a5f;border-radius:20px;padding:5px 12px;font-size:0.78rem;font-weight:600;}
 
-  .sort-group { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
-  .sort-btn { padding: 5px 10px; border: none; border-radius: 5px; background: transparent; color: var(--muted); font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-  .sort-btn.active { background: var(--blue-bg); color: var(--blue); }
+  /* TABS (admin only) */
+  .tabs{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:5px;margin-bottom:20px;}
+  .tab{flex:1;padding:8px;border:none;border-radius:7px;background:transparent;color:var(--muted);font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.2s;}
+  .tab.active{background:var(--blue-bg);color:var(--blue);}
+  .tab-content{display:none;}
+  .tab-content.active{display:block;}
 
-  .btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.83rem; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
-  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
-  .btn-primary { background: #0369a1; color: white; }
-  .btn-primary:hover:not(:disabled) { background: #0284c7; }
-  .btn-success { background: var(--green-bg); color: var(--green); border: 1px solid #166534; }
-  .btn-danger  { background: var(--red-bg); color: var(--red); border: none; }
-  .btn-ghost   { background: var(--blue-bg); color: var(--blue); border: 1px solid #1e3a5f; }
-  .btn-warning { background: var(--yellow-bg); color: var(--yellow); border: 1px solid #92400e; }
-
-  .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
-  .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
-  .sum-val { font-size: 1.4rem; font-weight: 800; }
-  .sum-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
-  .sum-green { color: var(--green); } .sum-yellow { color: var(--yellow); } .sum-red { color: var(--red); } .sum-blue { color: var(--blue); }
-
-  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-  .table-scroll { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 750px; }
-  thead { background: #131f35; }
-  th { padding: 11px 14px; text-align: left; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap; }
-  th:hover { color: var(--accent); }
-  td { padding: 12px 14px; border-bottom: 1px solid #1a2744; vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(56,189,248,0.03); }
-  tr.row-expired td:first-child { border-left: 3px solid var(--red); }
-  tr.row-expiring td:first-child { border-left: 3px solid var(--yellow); }
-  tr.row-active td:first-child { border-left: 3px solid var(--green); }
-
-  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
-  .badge-ok       { background: var(--green-bg);  color: var(--green); }
-  .badge-expired  { background: var(--red-bg);    color: var(--red); }
-  .badge-expiring { background: var(--yellow-bg); color: var(--yellow); }
-  .badge-checking { background: var(--blue-bg);   color: var(--blue); }
-  .badge-error    { background: var(--purple-bg); color: var(--purple); }
-
-  .pbar-wrap { min-width: 130px; }
-  .pbar-top { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
-  .pbar-bg { background: var(--border); border-radius: 3px; height: 6px; overflow: hidden; }
-  .pbar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
-
-  .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--blue); border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .action-btn { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); padding: 4px 8px; font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
-  .action-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .action-btn.del:hover { border-color: var(--red); color: var(--red); }
+  /* BUTTONS */
+  .btn{padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:0.83rem;font-weight:600;transition:all 0.2s;white-space:nowrap;}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;}
+  .btn-primary{background:#0369a1;color:white;}
+  .btn-primary:hover:not(:disabled){background:#0284c7;}
+  .btn-success{background:var(--green-bg);color:var(--green);border:1px solid #166534;}
+  .btn-danger{background:var(--red-bg);color:var(--red);border:none;}
+  .btn-ghost{background:var(--blue-bg);color:var(--blue);border:1px solid #1e3a5f;}
+  .btn-warning{background:var(--yellow-bg);color:var(--yellow);border:1px solid #92400e;}
+  .btn-full{width:100%;padding:12px;font-size:0.95rem;border-radius:10px;}
 
   /* SETTINGS BAR */
-  .settings-bar {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 16px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  .settings-bar label { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
-  .settings-bar input[type=number] {
-    width: 65px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 8px;
-    color: var(--text);
-    font-size: 0.85rem;
-    outline: none;
-    text-align: center;
-  }
-  .settings-bar input[type=number]:focus { border-color: var(--accent); }
-  .settings-bar span { font-size: 0.78rem; color: var(--muted); }
-  .settings-saved { font-size: 0.75rem; color: var(--green); display: none; }
+  .settings-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .settings-bar label{font-size:0.78rem;color:var(--muted);white-space:nowrap;}
+  .settings-bar input[type=number]{width:65px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:0.85rem;outline:none;text-align:center;}
+  .settings-bar input[type=number]:focus{border-color:var(--accent);}
+
+  /* TOPBAR */
+  .topbar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
+  .sort-group{display:flex;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:4px;}
+  .sort-btn{padding:5px 10px;border:none;border-radius:5px;background:transparent;color:var(--muted);font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+  .sort-btn.active{background:var(--blue-bg);color:var(--blue);}
+
+  /* SUMMARY */
+  .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+  .sum-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
+  .sum-val{font-size:1.4rem;font-weight:800;}
+  .sum-label{font-size:0.68rem;color:var(--muted);text-transform:uppercase;margin-top:2px;}
+  .sum-green{color:var(--green);}.sum-yellow{color:var(--yellow);}.sum-red{color:var(--red);}.sum-blue{color:var(--blue);}
+
+  /* TABLE */
+  .table-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .table-scroll{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem;min-width:750px;}
+  thead{background:#131f35;}
+  th{padding:11px 14px;text-align:left;font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;}
+  th:hover{color:var(--accent);}
+  td{padding:12px 14px;border-bottom:1px solid #1a2744;vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:rgba(56,189,248,0.03);}
+  tr.row-expired td:first-child{border-left:3px solid var(--red);}
+  tr.row-expiring td:first-child{border-left:3px solid var(--yellow);}
+  tr.row-active td:first-child{border-left:3px solid var(--green);}
+
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:0.72rem;font-weight:700;}
+  .badge-ok{background:var(--green-bg);color:var(--green);}
+  .badge-expired{background:var(--red-bg);color:var(--red);}
+  .badge-expiring{background:var(--yellow-bg);color:var(--yellow);}
+  .badge-checking{background:var(--blue-bg);color:var(--blue);}
+  .badge-error{background:var(--purple-bg);color:var(--purple);}
+
+  .pbar-wrap{min-width:130px;}
+  .pbar-top{display:flex;justify-content:space-between;font-size:0.7rem;color:var(--muted);margin-bottom:4px;}
+  .pbar-bg{background:var(--border);border-radius:3px;height:6px;overflow:hidden;}
+  .pbar-fill{height:100%;border-radius:3px;transition:width 0.5s ease;}
+
+  .spinner{display:inline-block;width:10px;height:10px;border:2px solid var(--blue);border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .action-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);padding:4px 8px;font-size:0.75rem;cursor:pointer;transition:all 0.15s;}
+  .action-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .action-btn.del:hover{border-color:var(--red);color:var(--red);}
+
+  /* CARD (for admin panels) */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+  .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .card-header h2{font-size:0.88rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;}
+
+  /* USER LIST */
+  .user-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);}
+  .user-item:last-child{border-bottom:none;}
+  .user-info{flex:1;}
+  .user-info strong{display:block;font-size:0.9rem;}
+  .user-info small{color:var(--muted);font-size:0.75rem;}
+  .role-badge{padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:700;}
+  .role-admin{background:#312e81;color:#a5b4fc;}
+  .role-viewer{background:var(--blue-bg);color:var(--blue);}
 
   /* MODAL */
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
-  .modal-overlay.open { display: flex; }
-  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 100%; max-width: 380px; }
-  .modal h3 { font-size: 1rem; margin-bottom: 16px; color: var(--accent); }
-  .modal label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 4px; }
-  .modal input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; color: var(--text); font-size: 0.9rem; margin-bottom: 12px; outline: none; }
-  .modal input:focus { border-color: var(--accent); }
-  .modal-btns { display: flex; gap: 8px; margin-top: 4px; }
-  .modal-btns .btn { flex: 1; padding: 10px; }
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;}
+  .modal h3{font-size:1rem;margin-bottom:16px;color:var(--accent);}
+  .modal label{font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px;}
+  .modal input,.modal select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:0.9rem;margin-bottom:12px;outline:none;}
+  .modal input:focus,.modal select:focus{border-color:var(--accent);}
+  .modal select option{background:var(--card);}
+  .modal-btns{display:flex;gap:8px;margin-top:4px;}
+  .modal-btns .btn{flex:1;padding:10px;}
 
-  /* ACCOUNTS MODAL */
-  .accounts-modal { max-width: 480px; }
-  .acc-item { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-  .acc-item:last-child { border-bottom: none; }
-  .acc-info { flex: 1; min-width: 0; }
-  .acc-info strong { font-size: 0.9rem; display: block; }
-  .acc-info small { color: var(--muted); font-size: 0.75rem; }
+  /* ASSIGN ACCOUNTS */
+  .assign-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .assign-item:last-child{border-bottom:none;}
+  .assign-item label{flex:1;font-size:0.88rem;cursor:pointer;}
+  .assign-item input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--accent);}
 
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--green-bg); color: var(--green); border: 1px solid #166534; padding: 10px 20px; border-radius: 8px; font-size: 0.83rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; z-index: 999; pointer-events: none; white-space: nowrap; }
-  .toast.show { opacity: 1; }
-  .last-checked { font-size: 0.73rem; color: var(--muted); text-align: right; padding: 8px 14px; }
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--green-bg);color:var(--green);border:1px solid #166534;padding:10px 20px;border-radius:8px;font-size:0.83rem;font-weight:600;opacity:0;transition:opacity 0.3s;z-index:999;pointer-events:none;white-space:nowrap;}
+  .toast.show{opacity:1;}
+  .last-checked{font-size:0.73rem;color:var(--muted);text-align:right;padding:8px 14px;}
+  .empty-state{text-align:center;color:var(--muted);padding:40px;font-size:0.88rem;}
 
-  @media (max-width: 500px) { .summary { grid-template-columns: repeat(2,1fr); } }
+  @media(max-width:500px){.summary{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>🌐 GigaNet Checker</h1>
-  <p>All accounts at a glance</p>
+<!-- ═══ LOGIN PAGE ═══════════════════════════════════════════════════════════ -->
+<div class="login-wrap" id="login-page">
+  <div class="login-box">
+    <h1>🌐 GigaNet</h1>
+    <p>Account Monitoring Dashboard</p>
+    <div class="login-error" id="login-error"></div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="your@email.com" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-primary btn-full" id="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
 </div>
 
-<!-- SETTINGS BAR -->
-<div class="settings-bar">
-  <label>⚠️ Warn when expiry is within</label>
-  <input type="number" id="warn-days" min="1" max="60" value="7" onchange="saveSettings()">
-  <span>days</span>
-  <span class="settings-saved" id="settings-saved">✅ Saved</span>
-</div>
+<!-- ═══ MAIN APP ══════════════════════════════════════════════════════════════ -->
+<div class="app-wrap" id="app-page">
 
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="topbar-left">
-    <div class="sort-group">
-      <span style="font-size:0.72rem;color:var(--muted);padding:5px 6px;align-self:center">Sort:</span>
-      <button class="sort-btn active" id="sort-name" onclick="setSort('name')">Name <span id="arr-name">↑</span></button>
-      <button class="sort-btn" id="sort-expiry" onclick="setSort('expiry')">Expiry <span id="arr-expiry">↑</span></button>
-      <button class="sort-btn" id="sort-traffic" onclick="setSort('traffic')">Remaining <span id="arr-traffic">↑</span></button>
+  <!-- NAV -->
+  <div class="topnav">
+    <h1>🌐 GigaNet Checker</h1>
+    <div class="topnav-right">
+      <span class="user-chip" id="user-chip">👤 User</span>
+      <button class="btn btn-danger" style="padding:6px 12px;font-size:0.78rem" onclick="doLogout()">Sign Out</button>
     </div>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-warning" onclick="openAccountsModal()">👤 Manage Accounts</button>
-    <button class="btn btn-primary" id="checkBtn" onclick="checkAll()">🔍 Refresh All</button>
+
+  <!-- ADMIN TABS -->
+  <div class="tabs" id="admin-tabs" style="display:none">
+    <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+    <button class="tab" onclick="switchTab('accounts')">🌐 GigaNet Accounts</button>
+    <button class="tab" onclick="switchTab('users')">👥 Users</button>
   </div>
-</div>
 
-<!-- SUMMARY -->
-<div class="summary">
-  <div class="sum-card"><div class="sum-val sum-green" id="s-active">—</div><div class="sum-label">Active</div></div>
-  <div class="sum-card"><div class="sum-val sum-yellow" id="s-expiring">—</div><div class="sum-label">Expiring Soon</div></div>
-  <div class="sum-card"><div class="sum-val sum-red" id="s-expired">—</div><div class="sum-label">Expired</div></div>
-  <div class="sum-card"><div class="sum-val sum-blue" id="s-total">—</div><div class="sum-label">Total</div></div>
-</div>
+  <!-- ── DASHBOARD TAB ─────────────────────────────────────────── -->
+  <div class="tab-content active" id="tab-dashboard">
 
-<!-- TABLE -->
-<div class="table-wrap">
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th onclick="setSort('name')">Account</th>
-          <th onclick="setSort('expiry')">Expiry Date</th>
-          <th onclick="setSort('expiry')">Days Left</th>
-          <th onclick="setSort('traffic')">Remaining Data</th>
-          <th>Traffic Used</th>
-          <th>Plan</th>
-          <th>Status</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody id="table-body">
-        <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px">
-          <span class="spinner"></span> Loading...
-        </td></tr>
-      </tbody>
-    </table>
+    <div class="settings-bar">
+      <label>⚠️ Warn when expiry within</label>
+      <input type="number" id="warn-days" min="1" max="60" value="7" onchange="saveSettings()">
+      <span style="font-size:0.78rem;color:var(--muted)">days</span>
+      <span id="settings-saved" style="font-size:0.75rem;color:var(--green);display:none">✅ Saved</span>
+    </div>
+
+    <div class="topbar">
+      <div class="sort-group">
+        <span style="font-size:0.72rem;color:var(--muted);padding:5px 6px;align-self:center">Sort:</span>
+        <button class="sort-btn active" id="sort-name" onclick="setSort('name')">Name <span id="arr-name">↑</span></button>
+        <button class="sort-btn" id="sort-expiry" onclick="setSort('expiry')">Expiry <span id="arr-expiry">↑</span></button>
+        <button class="sort-btn" id="sort-traffic" onclick="setSort('traffic')">Remaining <span id="arr-traffic">↑</span></button>
+      </div>
+      <button class="btn btn-primary" id="checkBtn" onclick="checkAll()">🔍 Refresh All</button>
+    </div>
+
+    <div class="summary">
+      <div class="sum-card"><div class="sum-val sum-green" id="s-active">—</div><div class="sum-label">Active</div></div>
+      <div class="sum-card"><div class="sum-val sum-yellow" id="s-expiring">—</div><div class="sum-label">Expiring Soon</div></div>
+      <div class="sum-card"><div class="sum-val sum-red" id="s-expired">—</div><div class="sum-label">Expired</div></div>
+      <div class="sum-card"><div class="sum-val sum-blue" id="s-total">—</div><div class="sum-label">Total</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="setSort('name')">Account</th>
+              <th onclick="setSort('expiry')">Expiry Date</th>
+              <th onclick="setSort('expiry')">Days Left</th>
+              <th onclick="setSort('traffic')">Remaining Data</th>
+              <th>Traffic Used</th>
+              <th>Plan</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr><td colspan="7" class="empty-state"><span class="spinner"></span> Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="last-checked" id="last-checked"></div>
+    </div>
   </div>
-  <div class="last-checked" id="last-checked"></div>
-</div>
 
-<!-- ADD/EDIT ACCOUNT MODAL -->
-<div class="modal-overlay" id="modal-edit">
+  <!-- ── ACCOUNTS TAB (admin) ──────────────────────────────────── -->
+  <div class="tab-content" id="tab-accounts">
+    <div class="card">
+      <div class="card-header">
+        <h2>GigaNet Accounts</h2>
+        <button class="btn btn-ghost" onclick="openAccModal()">+ Add Account</button>
+      </div>
+      <div id="acc-list"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ── USERS TAB (admin) ─────────────────────────────────────── -->
+  <div class="tab-content" id="tab-users">
+    <div class="card">
+      <div class="card-header">
+        <h2>App Users</h2>
+        <button class="btn btn-ghost" onclick="openUserModal()">+ Add User</button>
+      </div>
+      <div id="users-list"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+
+</div><!-- end app-wrap -->
+
+<!-- ═══ MODALS ════════════════════════════════════════════════════════════════ -->
+
+<!-- Add/Edit GigaNet Account -->
+<div class="modal-overlay" id="modal-acc">
   <div class="modal">
-    <h3 id="modal-title">Add Account</h3>
-    <label>Label (optional)</label>
-    <input type="text" id="m-label" placeholder="e.g. Home, Office, TVC" />
-    <label>Username</label>
-    <input type="text" id="m-user" placeholder="GigaNet username" autocomplete="off" spellcheck="false" />
-    <label>Password</label>
-    <input type="password" id="m-pass" placeholder="GigaNet password" autocomplete="off" />
+    <h3 id="acc-modal-title">Add GigaNet Account</h3>
+    <label>Label</label><input type="text" id="acc-label" placeholder="e.g. Home, Office">
+    <label>Username</label><input type="text" id="acc-user" placeholder="GigaNet username" autocomplete="off" spellcheck="false">
+    <label>Password</label><input type="password" id="acc-pass" placeholder="GigaNet password" autocomplete="off">
     <div class="modal-btns">
-      <button class="btn btn-danger" onclick="closeEditModal()">Cancel</button>
-      <button class="btn btn-success" id="modal-save-btn" onclick="saveAccount()">💾 Save</button>
+      <button class="btn btn-danger" onclick="closeModal('modal-acc')">Cancel</button>
+      <button class="btn btn-success" id="acc-save-btn" onclick="saveGigaNetAccount()">💾 Save</button>
     </div>
   </div>
 </div>
 
-<!-- ACCOUNTS LIST MODAL -->
-<div class="modal-overlay" id="modal-accounts">
-  <div class="modal accounts-modal">
-    <h3>👤 Manage Accounts</h3>
-    <div id="accounts-list-modal" style="max-height:350px;overflow-y:auto;margin-bottom:16px"></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-ghost" style="flex:1" onclick="openAddModal()">+ Add Account</button>
-      <button class="btn btn-danger" onclick="closeAccountsModal()">Close</button>
+<!-- Add/Edit App User -->
+<div class="modal-overlay" id="modal-user">
+  <div class="modal">
+    <h3 id="user-modal-title">Add User</h3>
+    <label>Name</label><input type="text" id="u-name" placeholder="Full name">
+    <label>Email</label><input type="email" id="u-email" placeholder="user@email.com" autocomplete="off">
+    <label>Password</label><input type="password" id="u-pass" placeholder="Password" autocomplete="off">
+    <label>Role</label>
+    <select id="u-role">
+      <option value="viewer">Viewer</option>
+      <option value="admin">Admin</option>
+    </select>
+    <div class="modal-btns">
+      <button class="btn btn-danger" onclick="closeModal('modal-user')">Cancel</button>
+      <button class="btn btn-success" id="user-save-btn" onclick="saveAppUser()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Accounts to User -->
+<div class="modal-overlay" id="modal-assign">
+  <div class="modal">
+    <h3 id="assign-title">Assign Accounts</h3>
+    <p style="font-size:0.8rem;color:var(--muted);margin-bottom:14px">Select which GigaNet accounts this user can see:</p>
+    <div id="assign-list"></div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn btn-danger" onclick="closeModal('modal-assign')">Cancel</button>
+      <button class="btn btn-success" id="assign-save-btn" onclick="saveAssignments()">💾 Save</button>
     </div>
   </div>
 </div>
@@ -236,25 +317,82 @@ const AES_KEY     = 'abcdefghijuklmno0123456789012345';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let accounts  = [];
-let results   = {};
-let sortKey   = 'name';
-let sortAsc   = true;
-let editingId = null;
-let warnDays  = 7;
+let currentUser  = null;
+let allAccounts  = [];
+let allAppUsers  = [];
+let visibleAccounts = [];
+let results      = {};
+let sortKey      = 'name';
+let sortAsc      = true;
+let warnDays     = 7;
+let editingAccId = null;
+let editingUserId= null;
+let assigningUserId = null;
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
-async function init() {
-  loadSettings();
-  await loadAccounts();
-  renderTable();
-  if (accounts.length > 0) checkAll();
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value.trim();
+  const errEl = document.getElementById('login-error');
+  const btn   = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  if (!email || !pass) { showLoginError('Please enter email and password.'); return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  const { data, error } = await db.from('app_users').select('*').eq('email', email).eq('password', pass).single();
+  btn.disabled = false; btn.textContent = 'Sign In';
+  if (error || !data) { showLoginError('Invalid email or password.'); return; }
+  currentUser = data;
+  sessionStorage.setItem('giganet_user', JSON.stringify(data));
+  showApp();
 }
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+function doLogout() {
+  sessionStorage.removeItem('giganet_user');
+  currentUser = null;
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('app-page').style.display   = 'none';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value  = '';
+}
+
+async function showApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app-page').style.display   = 'block';
+  document.getElementById('user-chip').textContent = '👤 ' + (currentUser.name || currentUser.email);
+
+  // Admin gets tabs, viewer only gets dashboard
+  if (currentUser.role === 'admin') {
+    document.getElementById('admin-tabs').style.display = 'flex';
+  }
+
+  loadSettings();
+  await loadAllAccounts();
+  await loadVisibleAccounts();
+  renderDashboard();
+  checkAll();
+
+  if (currentUser.role === 'admin') {
+    await loadAppUsers();
+    renderAccList();
+    renderUsersList();
+  }
+}
+
+// ── SESSION RESTORE ───────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  const saved = sessionStorage.getItem('giganet_user');
+  if (saved) { currentUser = JSON.parse(saved); showApp(); }
+});
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────────
 function loadSettings() {
-  const saved = localStorage.getItem('giganet_warn_days');
-  if (saved) { warnDays = parseInt(saved); document.getElementById('warn-days').value = warnDays; }
+  const s = localStorage.getItem('giganet_warn_days');
+  if (s) { warnDays = parseInt(s); document.getElementById('warn-days').value = warnDays; }
 }
 function saveSettings() {
   warnDays = parseInt(document.getElementById('warn-days').value) || 7;
@@ -265,57 +403,71 @@ function saveSettings() {
   renderTable();
 }
 
-// ── SUPABASE ──────────────────────────────────────────────────────────────────
-async function loadAccounts() {
-  const { data, error } = await db.from('giganet_accounts').select('*').order('created_at');
-  if (!error && data) accounts = data;
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const idx = ['dashboard','accounts','users'].indexOf(name);
+  document.querySelectorAll('.tab')[idx]?.classList.add('active');
+}
+
+// ── DATA LOADING ──────────────────────────────────────────────────────────────
+async function loadAllAccounts() {
+  const { data } = await db.from('giganet_accounts').select('*').order('created_at');
+  allAccounts = data || [];
+}
+
+async function loadVisibleAccounts() {
+  if (currentUser.role === 'admin') {
+    visibleAccounts = allAccounts;
+  } else {
+    const { data } = await db.from('user_accounts').select('account_id').eq('user_id', currentUser.id);
+    const ids = (data || []).map(r => r.account_id);
+    visibleAccounts = allAccounts.filter(a => ids.includes(a.id));
+  }
+}
+
+async function loadAppUsers() {
+  const { data } = await db.from('app_users').select('*').order('created_at');
+  allAppUsers = data || [];
 }
 
 // ── SORT ──────────────────────────────────────────────────────────────────────
 function setSort(key) {
   if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = true; }
   ['name','expiry','traffic'].forEach(k => {
-    document.getElementById('sort-' + k).classList.remove('active');
-    document.getElementById('arr-' + k).textContent = '↑';
+    document.getElementById('sort-'+k).classList.remove('active');
+    document.getElementById('arr-'+k).textContent = '↑';
   });
-  document.getElementById('sort-' + key).classList.add('active');
-  document.getElementById('arr-' + key).textContent = sortAsc ? '↑' : '↓';
+  document.getElementById('sort-'+key).classList.add('active');
+  document.getElementById('arr-'+key).textContent = sortAsc ? '↑' : '↓';
   renderTable();
 }
 
 function sortedAccounts() {
-  return [...accounts].sort((a, b) => {
+  return [...visibleAccounts].sort((a,b) => {
     let av, bv;
-    if (sortKey === 'name') {
-      av = (a.label || a.username).toLowerCase();
-      bv = (b.label || b.username).toLowerCase();
-    } else if (sortKey === 'expiry') {
-      av = results[a.id]?.daysLeft ?? 99999;
-      bv = results[b.id]?.daysLeft ?? 99999;
-    } else {
-      // sort by remaining (remBytes descending by default)
-      av = results[a.id]?.remBytes ?? -1;
-      bv = results[b.id]?.remBytes ?? -1;
-    }
-    if (av < bv) return sortAsc ? -1 : 1;
-    if (av > bv) return sortAsc ? 1 : -1;
-    return 0;
+    if (sortKey==='name')   { av=(a.label||a.username).toLowerCase(); bv=(b.label||b.username).toLowerCase(); }
+    else if (sortKey==='expiry')  { av=results[a.id]?.daysLeft??99999; bv=results[b.id]?.daysLeft??99999; }
+    else                    { av=results[a.id]?.remBytes??-1; bv=results[b.id]?.remBytes??-1; }
+    return sortAsc ? (av<bv?-1:av>bv?1:0) : (av>bv?-1:av<bv?1:0);
   });
 }
 
-// ── RENDER ────────────────────────────────────────────────────────────────────
+// ── DASHBOARD RENDER ──────────────────────────────────────────────────────────
+function renderDashboard() { renderTable(); }
+
 function renderTable() {
   const tbody = document.getElementById('table-body');
-  if (accounts.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px">
-      No accounts yet. Click <strong style="color:var(--blue)">Manage Accounts</strong> to add some.
-    </td></tr>`;
+  if (!visibleAccounts.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No accounts assigned to you yet.</td></tr>`;
     updateSummary(); return;
   }
   tbody.innerHTML = sortedAccounts().map(acc => {
     const r = results[acc.id];
-    if (!r)        return loadingRow(acc);
-    if (r.error)   return errorRow(acc, r.error);
+    if (!r)      return loadingRow(acc);
+    if (r.error) return errorRow(acc, r.error);
     return dataRow(acc, r);
   }).join('');
   updateSummary();
@@ -323,231 +475,236 @@ function renderTable() {
 
 function loadingRow(acc) {
   return `<tr id="row-${acc.id}">
-    <td><strong>${esc(acc.label || acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
-    <td colspan="5"><span class="spinner"></span> <span style="color:var(--muted);font-size:0.8rem">Checking...</span></td>
-    <td><span class="badge badge-checking">Loading</span></td>
-    <td>${actionBtns(acc)}</td>
+    <td><strong>${esc(acc.label||acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
+    <td colspan="4"><span class="spinner"></span> <span style="color:var(--muted);font-size:0.8rem">Checking...</span></td>
+    <td></td><td><span class="badge badge-checking">Loading</span></td>
   </tr>`;
 }
-
 function errorRow(acc, err) {
   return `<tr id="row-${acc.id}">
-    <td><strong>${esc(acc.label || acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
+    <td><strong>${esc(acc.label||acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
     <td colspan="5" style="color:var(--purple);font-size:0.78rem">${esc(err)}</td>
     <td><span class="badge badge-error">✕ Error</span></td>
-    <td>${actionBtns(acc)}</td>
   </tr>`;
 }
-
 function dataRow(acc, r) {
-  const isExpired  = r.daysLeft != null && r.daysLeft < 0;
-  const isExpiring = r.daysLeft != null && r.daysLeft >= 0 && r.daysLeft <= warnDays;
-  const rowClass   = isExpired ? 'row-expired' : isExpiring ? 'row-expiring' : 'row-active';
-  const daysColor  = isExpired ? 'var(--red)' : isExpiring ? 'var(--yellow)' : 'var(--green)';
-  const daysText   = r.daysLeft == null ? '—' : isExpired ? Math.abs(r.daysLeft) + 'd overdue' : r.daysLeft + ' days';
-  const remColor   = r.remPct < 10 ? 'var(--red)' : r.remPct < 25 ? 'var(--yellow)' : 'var(--green)';
-  const usedColor  = r.usedPct > 90 ? 'var(--red)' : r.usedPct > 75 ? 'var(--yellow)' : 'var(--muted)';
-
-  let badge = isExpired  ? `<span class="badge badge-expired">✕ Expired</span>`
-            : isExpiring ? `<span class="badge badge-expiring">⚠️ Soon</span>`
-            :              `<span class="badge badge-ok">✓ Active</span>`;
-
+  const isExpired  = r.daysLeft!=null && r.daysLeft<0;
+  const isExpiring = r.daysLeft!=null && r.daysLeft>=0 && r.daysLeft<=warnDays;
+  const rowClass   = isExpired?'row-expired':isExpiring?'row-expiring':'row-active';
+  const daysColor  = isExpired?'var(--red)':isExpiring?'var(--yellow)':'var(--green)';
+  const daysText   = r.daysLeft==null?'—':isExpired?Math.abs(r.daysLeft)+'d overdue':r.daysLeft+' days';
+  const remColor   = r.remPct<10?'var(--red)':r.remPct<25?'var(--yellow)':'var(--green)';
+  const badge      = isExpired?`<span class="badge badge-expired">✕ Expired</span>`
+                   : isExpiring?`<span class="badge badge-expiring">⚠️ Soon</span>`
+                   : `<span class="badge badge-ok">✓ Active</span>`;
   return `<tr class="${rowClass}" id="row-${acc.id}">
-    <td><strong>${esc(acc.label || acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
+    <td><strong>${esc(acc.label||acc.username)}</strong><br><small style="color:var(--muted)">${esc(acc.username)}</small></td>
     <td style="color:${daysColor};font-weight:600">${r.expFormatted}</td>
     <td style="color:${daysColor};font-weight:700">${daysText}</td>
     <td>
       <div class="pbar-wrap">
-        <div class="pbar-top">
-          <span style="color:${remColor};font-weight:700">${r.remGB} GB</span>
-          <span>${r.maxGB ? 'of ' + r.maxGB + ' GB' : ''}</span>
-        </div>
-        <div class="pbar-bg">
-          <div class="pbar-fill" style="width:${r.remPct}%;background:${remColor}"></div>
-        </div>
+        <div class="pbar-top"><span style="color:${remColor};font-weight:700">${r.remGB} GB</span><span>${r.maxGB?'of '+r.maxGB+' GB':''}</span></div>
+        <div class="pbar-bg"><div class="pbar-fill" style="width:${r.remPct}%;background:${remColor}"></div></div>
       </div>
     </td>
-    <td style="color:${usedColor};font-size:0.82rem">${r.usedGB} GB</td>
+    <td style="font-size:0.82rem;color:var(--muted)">${r.usedGB} GB</td>
     <td style="font-size:0.75rem;color:var(--muted);max-width:140px">${esc(r.profileName)}</td>
     <td>${badge}</td>
-    <td>${actionBtns(acc)}</td>
   </tr>`;
 }
 
-function actionBtns(acc) {
-  return `<div style="display:flex;gap:6px">
-    <button class="action-btn" onclick='openEditModal(${JSON.stringify(acc).replace(/'/g,"&#39;")})'>✏️</button>
-    <button class="action-btn del" onclick="deleteAccount('${acc.id}')">🗑️</button>
-  </div>`;
-}
-
 function updateSummary() {
-  const done     = Object.values(results).filter(r => !r.loading && !r.error);
-  const expired  = done.filter(r => r.daysLeft != null && r.daysLeft < 0).length;
-  const expiring = done.filter(r => r.daysLeft != null && r.daysLeft >= 0 && r.daysLeft <= warnDays).length;
-  const active   = done.filter(r => r.daysLeft == null || r.daysLeft > warnDays).length;
+  const done     = Object.values(results).filter(r=>!r.error);
+  const visible  = visibleAccounts.map(a=>results[a.id]).filter(r=>r&&!r.error);
+  const expired  = visible.filter(r=>r.daysLeft!=null&&r.daysLeft<0).length;
+  const expiring = visible.filter(r=>r.daysLeft!=null&&r.daysLeft>=0&&r.daysLeft<=warnDays).length;
+  const active   = visible.filter(r=>r.daysLeft==null||r.daysLeft>warnDays).length;
   document.getElementById('s-active').textContent   = active;
   document.getElementById('s-expiring').textContent = expiring;
   document.getElementById('s-expired').textContent  = expired;
-  document.getElementById('s-total').textContent    = accounts.length;
+  document.getElementById('s-total').textContent    = visibleAccounts.length;
 }
 
-// ── CHECK ─────────────────────────────────────────────────────────────────────
+// ── CHECK ALL ─────────────────────────────────────────────────────────────────
 async function checkAll() {
-  if (!accounts.length) return;
+  if (!visibleAccounts.length) return;
   const btn = document.getElementById('checkBtn');
-  btn.disabled = true; btn.textContent = '⏳ Refreshing...';
-  results = {};
+  btn.disabled=true; btn.textContent='⏳ Refreshing...';
+  results={};
   renderTable();
-  await Promise.all(accounts.map(checkAccount));
+  await Promise.all(visibleAccounts.map(checkAccount));
   renderTable();
-  btn.disabled = false; btn.textContent = '🔍 Refresh All';
-  document.getElementById('last-checked').textContent = 'Last updated: ' + new Date().toLocaleTimeString('en-GB');
+  btn.disabled=false; btn.textContent='🔍 Refresh All';
+  document.getElementById('last-checked').textContent='Last updated: '+new Date().toLocaleTimeString('en-GB');
 }
 
 async function checkAccount(acc) {
   try {
-    const encrypted = CryptoJS.AES.encrypt(
-      JSON.stringify({ username: acc.username, password: acc.password }), AES_KEY
-    ).toString();
-
-    const loginRes = await fetch(`${GIGANET}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payload: encrypted })
-    });
-    if (!loginRes.ok) throw new Error('Login failed (' + loginRes.status + ')');
+    const encrypted = CryptoJS.AES.encrypt(JSON.stringify({username:acc.username,password:acc.password}),AES_KEY).toString();
+    const loginRes  = await fetch(`${GIGANET}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({payload:encrypted})});
+    if (!loginRes.ok) throw new Error('Login failed ('+loginRes.status+')');
     const token = (await loginRes.json()).token;
     if (!token) throw new Error('Wrong username or password');
-
-    const svcRes = await fetch(`${GIGANET}/service`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
+    const svcRes = await fetch(`${GIGANET}/service`,{headers:{'Authorization':'Bearer '+token}});
     if (!svcRes.ok) throw new Error('Service fetch failed');
-    const svc = (await svcRes.json()).data || {};
-
-    const expiration  = svc.expiration || null;
-    const profileName = svc.profile_name || '—';
-    const trafficUsed = svc.limits?.rxtx_bytes || 0;   // bytes consumed
-    const trafficMax  = svc.traffic_limit || 0;          // total bytes
-
-    // Remaining = what has been used (rxtx_bytes) — as requested
-    // Used = what's left (traffic_limit - rxtx_bytes) — as requested
-    const remBytes = trafficUsed;
-    const usedBytes = trafficMax ? Math.max(0, trafficMax - trafficUsed) : 0;
-    const maxGB    = trafficMax  ? parseFloat((trafficMax  / 1073741824).toFixed(0)) : null;
-    const remGB    = parseFloat((remBytes  / 1073741824).toFixed(2));
-    const usedGB   = parseFloat((usedBytes / 1073741824).toFixed(2));
-    const remPct   = maxGB ? Math.min(100, Math.round(remBytes  / trafficMax * 100)) : 0;
-    const usedPct  = maxGB ? Math.min(100, Math.round(usedBytes / trafficMax * 100)) : 0;
-
-    let daysLeft = null, expFormatted = '—';
-    if (expiration) {
-      const expDate = new Date(expiration);
-      daysLeft = Math.ceil((expDate - new Date()) / 86400000);
-      expFormatted = expDate.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-    }
-
-    results[acc.id] = { daysLeft, expFormatted, profileName, remGB, usedGB, maxGB, remPct, usedPct, remBytes };
-  } catch(err) {
-    results[acc.id] = { error: err.message };
-  }
+    const svc = (await svcRes.json()).data||{};
+    const expiration=svc.expiration||null, profileName=svc.profile_name||'—';
+    const trafficUsed=svc.limits?.rxtx_bytes||0, trafficMax=svc.traffic_limit||0;
+    const remBytes=trafficUsed, usedBytes=trafficMax?Math.max(0,trafficMax-trafficUsed):0;
+    const maxGB=trafficMax?parseFloat((trafficMax/1073741824).toFixed(0)):null;
+    const remGB=parseFloat((remBytes/1073741824).toFixed(2));
+    const usedGB=parseFloat((usedBytes/1073741824).toFixed(2));
+    const remPct=maxGB?Math.min(100,Math.round(remBytes/trafficMax*100)):0;
+    let daysLeft=null,expFormatted='—';
+    if (expiration) { const d=new Date(expiration); daysLeft=Math.ceil((d-new Date())/86400000); expFormatted=d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+    results[acc.id]={daysLeft,expFormatted,profileName,remGB,usedGB,maxGB,remPct,remBytes};
+  } catch(err) { results[acc.id]={error:err.message}; }
 }
 
-// ── ACCOUNTS MODAL ────────────────────────────────────────────────────────────
-function openAccountsModal() {
-  renderAccountsList();
-  document.getElementById('modal-accounts').classList.add('open');
-}
-function closeAccountsModal() {
-  document.getElementById('modal-accounts').classList.remove('open');
-}
-function renderAccountsList() {
-  const el = document.getElementById('accounts-list-modal');
-  if (!accounts.length) { el.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;padding:10px 0">No accounts yet.</p>'; return; }
-  el.innerHTML = accounts.map(acc => `
-    <div class="acc-item">
-      <div class="acc-info">
-        <strong>${esc(acc.label || acc.username)}</strong>
+// ── GIGANET ACCOUNTS (admin) ──────────────────────────────────────────────────
+function renderAccList() {
+  const el = document.getElementById('acc-list');
+  if (!allAccounts.length) { el.innerHTML='<div class="empty-state">No accounts yet.</div>'; return; }
+  el.innerHTML = allAccounts.map(acc=>`
+    <div class="user-item">
+      <div class="user-info">
+        <strong>${esc(acc.label||acc.username)}</strong>
         <small>${esc(acc.username)}</small>
       </div>
-      <button class="action-btn" onclick='openEditModal(${JSON.stringify(acc).replace(/'/g,"&#39;")})'>✏️ Edit</button>
-      <button class="action-btn del" onclick="deleteAccount('${acc.id}')">🗑️</button>
-    </div>
-  `).join('');
+      <button class="action-btn" onclick='openAccModal(${JSON.stringify(acc).replace(/'/g,"&#39;")})'>✏️ Edit</button>
+      <button class="action-btn del" onclick="deleteGigaNetAccount('${acc.id}')">🗑️</button>
+    </div>`).join('');
 }
 
-// ── EDIT MODAL ────────────────────────────────────────────────────────────────
-function openAddModal() {
-  editingId = null;
-  document.getElementById('modal-title').textContent = 'Add Account';
-  document.getElementById('m-label').value = '';
-  document.getElementById('m-user').value  = '';
-  document.getElementById('m-pass').value  = '';
-  document.getElementById('modal-accounts').classList.remove('open');
-  document.getElementById('modal-edit').classList.add('open');
-}
-function openEditModal(acc) {
-  editingId = acc.id;
-  document.getElementById('modal-title').textContent = 'Edit Account';
-  document.getElementById('m-label').value = acc.label || '';
-  document.getElementById('m-user').value  = acc.username;
-  document.getElementById('m-pass').value  = acc.password;
-  document.getElementById('modal-accounts').classList.remove('open');
-  document.getElementById('modal-edit').classList.add('open');
-}
-function closeEditModal() {
-  document.getElementById('modal-edit').classList.remove('open');
-  editingId = null;
+function openAccModal(acc=null) {
+  editingAccId = acc?.id||null;
+  document.getElementById('acc-modal-title').textContent = acc?'Edit Account':'Add GigaNet Account';
+  document.getElementById('acc-label').value = acc?.label||'';
+  document.getElementById('acc-user').value  = acc?.username||'';
+  document.getElementById('acc-pass').value  = acc?.password||'';
+  openModal('modal-acc');
 }
 
-async function saveAccount() {
-  const label    = document.getElementById('m-label').value.trim();
-  const username = document.getElementById('m-user').value.trim();
-  const password = document.getElementById('m-pass').value.trim();
-  if (!username || !password) { showToast('⚠️ Username and password required', true); return; }
-  const btn = document.getElementById('modal-save-btn');
-  btn.disabled = true; btn.textContent = 'Saving...';
-  if (editingId) {
-    await db.from('giganet_accounts').update({ label, username, password }).eq('id', editingId);
-    showToast('✅ Account updated');
-  } else {
-    await db.from('giganet_accounts').insert({ label, username, password });
-    showToast('✅ Account added');
-  }
-  btn.disabled = false; btn.textContent = '💾 Save';
-  closeEditModal();
-  await loadAccounts();
-  results = {};
-  renderTable();
-  checkAll();
+async function saveGigaNetAccount() {
+  const label=document.getElementById('acc-label').value.trim();
+  const username=document.getElementById('acc-user').value.trim();
+  const password=document.getElementById('acc-pass').value.trim();
+  if (!username||!password){showToast('⚠️ Username and password required',true);return;}
+  const btn=document.getElementById('acc-save-btn');
+  btn.disabled=true;btn.textContent='Saving...';
+  if (editingAccId) await db.from('giganet_accounts').update({label,username,password}).eq('id',editingAccId);
+  else await db.from('giganet_accounts').insert({label,username,password});
+  btn.disabled=false;btn.textContent='💾 Save';
+  closeModal('modal-acc');
+  showToast(editingAccId?'✅ Account updated':'✅ Account added');
+  await loadAllAccounts(); await loadVisibleAccounts();
+  renderAccList(); results={}; renderTable(); checkAll();
 }
 
-async function deleteAccount(id) {
-  if (!confirm('Delete this account?')) return;
-  await db.from('giganet_accounts').delete().eq('id', id);
+async function deleteGigaNetAccount(id) {
+  if (!confirm('Delete this GigaNet account?')) return;
+  await db.from('giganet_accounts').delete().eq('id',id);
   delete results[id];
-  await loadAccounts();
-  renderTable();
-  renderAccountsList();
+  await loadAllAccounts(); await loadVisibleAccounts();
+  renderAccList(); renderTable();
   showToast('🗑️ Account deleted');
 }
 
-document.getElementById('modal-edit').addEventListener('click', e => { if (e.target === e.currentTarget) closeEditModal(); });
-document.getElementById('modal-accounts').addEventListener('click', e => { if (e.target === e.currentTarget) closeAccountsModal(); });
-
-function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function showToast(msg, isError = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.background  = isError ? 'var(--purple-bg)' : 'var(--green-bg)';
-  t.style.color       = isError ? 'var(--purple)'    : 'var(--green)';
-  t.style.borderColor = isError ? '#6b21a8'          : '#166534';
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+// ── APP USERS (admin) ─────────────────────────────────────────────────────────
+function renderUsersList() {
+  const el = document.getElementById('users-list');
+  if (!allAppUsers.length) { el.innerHTML='<div class="empty-state">No users yet.</div>'; return; }
+  el.innerHTML = allAppUsers.map(u=>`
+    <div class="user-item">
+      <div class="user-info">
+        <strong>${esc(u.name||u.email)} <span class="role-badge role-${u.role}">${u.role}</span></strong>
+        <small>${esc(u.email)}</small>
+      </div>
+      <button class="action-btn" onclick="openAssignModal('${u.id}','${esc(u.name||u.email)}')">🔗 Assign</button>
+      <button class="action-btn" onclick='openUserModal(${JSON.stringify(u).replace(/'/g,"&#39;")})'>✏️</button>
+      <button class="action-btn del" onclick="deleteAppUser('${u.id}')">🗑️</button>
+    </div>`).join('');
 }
 
-init();
+function openUserModal(u=null) {
+  editingUserId=u?.id||null;
+  document.getElementById('user-modal-title').textContent=u?'Edit User':'Add User';
+  document.getElementById('u-name').value=u?.name||'';
+  document.getElementById('u-email').value=u?.email||'';
+  document.getElementById('u-pass').value=u?.password||'';
+  document.getElementById('u-role').value=u?.role||'viewer';
+  openModal('modal-user');
+}
+
+async function saveAppUser() {
+  const name=document.getElementById('u-name').value.trim();
+  const email=document.getElementById('u-email').value.trim();
+  const password=document.getElementById('u-pass').value.trim();
+  const role=document.getElementById('u-role').value;
+  if (!email||!password){showToast('⚠️ Email and password required',true);return;}
+  const btn=document.getElementById('user-save-btn');
+  btn.disabled=true;btn.textContent='Saving...';
+  if (editingUserId) await db.from('app_users').update({name,email,password,role}).eq('id',editingUserId);
+  else await db.from('app_users').insert({name,email,password,role});
+  btn.disabled=false;btn.textContent='💾 Save';
+  closeModal('modal-user');
+  showToast(editingUserId?'✅ User updated':'✅ User added');
+  await loadAppUsers(); renderUsersList();
+}
+
+async function deleteAppUser(id) {
+  if (id===currentUser.id){showToast('⚠️ Cannot delete yourself',true);return;}
+  if (!confirm('Delete this user?')) return;
+  await db.from('app_users').delete().eq('id',id);
+  await loadAppUsers(); renderUsersList();
+  showToast('🗑️ User deleted');
+}
+
+// ── ASSIGN ACCOUNTS ───────────────────────────────────────────────────────────
+async function openAssignModal(userId, userName) {
+  assigningUserId = userId;
+  document.getElementById('assign-title').textContent = '🔗 Assign Accounts to ' + userName;
+  const { data: existing } = await db.from('user_accounts').select('account_id').eq('user_id', userId);
+  const assigned = (existing||[]).map(r=>r.account_id);
+  document.getElementById('assign-list').innerHTML = allAccounts.map(acc=>`
+    <div class="assign-item">
+      <input type="checkbox" id="chk-${acc.id}" value="${acc.id}" ${assigned.includes(acc.id)?'checked':''}>
+      <label for="chk-${acc.id}">${esc(acc.label||acc.username)} <small style="color:var(--muted)">${esc(acc.username)}</small></label>
+    </div>`).join('');
+  openModal('modal-assign');
+}
+
+async function saveAssignments() {
+  const btn=document.getElementById('assign-save-btn');
+  btn.disabled=true;btn.textContent='Saving...';
+  const checked = [...document.querySelectorAll('#assign-list input:checked')].map(c=>c.value);
+  await db.from('user_accounts').delete().eq('user_id',assigningUserId);
+  if (checked.length) {
+    await db.from('user_accounts').insert(checked.map(account_id=>({user_id:assigningUserId,account_id})));
+  }
+  btn.disabled=false;btn.textContent='💾 Save';
+  closeModal('modal-assign');
+  showToast('✅ Accounts assigned');
+}
+
+// ── MODAL HELPERS ─────────────────────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+['modal-acc','modal-user','modal-assign'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal(id);});
+});
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function esc(s){return(s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function showToast(msg,isError=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=isError?'var(--purple-bg)':'var(--green-bg)';
+  t.style.color=isError?'var(--purple)':'var(--green)';
+  t.style.borderColor=isError?'#6b21a8':'#166534';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
 </script>
 </body>
 </html>
