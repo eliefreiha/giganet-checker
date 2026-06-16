@@ -447,7 +447,7 @@ function dataRow(acc, r) {
   const daysColor = r.daysLeft == null ? 'var(--blue)' : r.daysLeft < 0 ? 'var(--red)' : r.daysLeft <= 7 ? 'var(--yellow)' : 'var(--green)';
   const daysText  = r.daysLeft == null ? '—' : r.daysLeft < 0 ? Math.abs(r.daysLeft) + 'd overdue' : r.daysLeft + ' days';
   const barColor  = r.pct > 85 ? 'var(--red)' : r.pct > 60 ? 'var(--yellow)' : 'var(--green)';
-  const remGB     = r.maxGB ? Math.max(0, r.maxGB - r.usedGB).toFixed(1) + ' GB' : '—';
+  const remGB     = r.remGB ?? "—";
 
   let badge = '';
   if (r.daysLeft == null)    badge = `<span class="badge badge-ok">✓ Active</span>`;
@@ -550,9 +550,10 @@ async function checkAccount(acc) {
 
     const usedGB = parseFloat((trafficUsed / 1073741824).toFixed(2));
     const maxGB  = trafficMax ? parseFloat((trafficMax  / 1073741824).toFixed(0)) : null;
+    const remGB  = trafficMax ? (Math.max(0, trafficMax - trafficUsed) / 1073741824).toFixed(2) + " GB" : "—";
     const pct    = maxGB ? Math.min(100, Math.round(usedGB / maxGB * 100)) : 0;
 
-    results[acc.id] = { daysLeft, expFormatted, profileName, usedGB, maxGB, pct };
+    results[acc.id] = { daysLeft, expFormatted, profileName, usedGB, maxGB, remGB, pct };
   } catch(err) {
     results[acc.id] = { error: err.message };
   }
