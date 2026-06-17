@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GigaNet Checker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#64748b;
@@ -327,13 +326,60 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SUPABASE_URL = 'https://xhfenawfbcxixtjlbvlc.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoZmVuYXdmYmN4aXh0amxidmxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MzIxMzYsImV4cCI6MjA5NzIwODEzNn0.UplccqwXC-yLfC8QUYUEuxoRsot1gdX8KFOJnAcHxKg';
-const GIGANET     = 'https://winter-darkness-9a8f.freiha-elie2013.workers.dev';
-const AES_KEY     = 'abcdefghijuklmno0123456789012345';
+const API = '';  // same origin
+const GIGANET = '/proxy';
+const AES_KEY = 'abcdefghijuklmno0123456789012345';
 
-const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const db = {
+  async login(email, password) {
+    const r = await fetch(`${API}/api/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, password}) });
+    return r.json();
+  },
+  async getAccounts() {
+    const r = await fetch(`${API}/api/accounts`);
+    return r.json();
+  },
+  async addAccount(data) {
+    const r = await fetch(`${API}/api/accounts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    return r.json();
+  },
+  async updateAccount(id, data) {
+    const r = await fetch(`${API}/api/accounts/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    return r.json();
+  },
+  async deleteAccount(id) {
+    const r = await fetch(`${API}/api/accounts/${id}`, { method:'DELETE' });
+    return r.json();
+  },
+  async getUsers() {
+    const r = await fetch(`${API}/api/users`);
+    return r.json();
+  },
+  async addUser(data) {
+    const r = await fetch(`${API}/api/users`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    return r.json();
+  },
+  async updateUser(id, data) {
+    const r = await fetch(`${API}/api/users/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    return r.json();
+  },
+  async deleteUser(id) {
+    const r = await fetch(`${API}/api/users/${id}`, { method:'DELETE' });
+    return r.json();
+  },
+  async getUserAccounts(userId) {
+    const r = await fetch(`${API}/api/user-accounts/${userId}`);
+    return r.json();
+  },
+  async saveUserAccounts(userId, accountIds) {
+    const r = await fetch(`${API}/api/user-accounts/${userId}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({accountIds}) });
+    return r.json();
+  },
+  async changePassword(id, password) {
+    const r = await fetch(`${API}/api/change-password/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password}) });
+    return r.json();
+  }
+};
 
 let currentUser  = null;
 let allAccounts  = [];
@@ -356,12 +402,14 @@ async function doLogin() {
   errEl.style.display = 'none';
   if (!email || !pass) { showLoginError('Please enter email and password.'); return; }
   btn.disabled = true; btn.textContent = 'Signing in...';
-  const { data, error } = await db.from('app_users').select('*').eq('email', email).eq('password', pass).single();
+  try {
+    const data = await db.login(email, pass);
+    if (data.error) { showLoginError('Invalid email or password.'); btn.disabled=false; btn.textContent='Sign In'; return; }
+    currentUser = data;
+    sessionStorage.setItem('giganet_user', JSON.stringify(data));
+    showApp();
+  } catch(e) { showLoginError('Connection error. Please try again.'); }
   btn.disabled = false; btn.textContent = 'Sign In';
-  if (error || !data) { showLoginError('Invalid email or password.'); return; }
-  currentUser = data;
-  sessionStorage.setItem('giganet_user', JSON.stringify(data));
-  showApp();
 }
 
 function showLoginError(msg) {
@@ -471,23 +519,20 @@ function switchTab(name) {
 
 // ── DATA LOADING ──────────────────────────────────────────────────────────────
 async function loadAllAccounts() {
-  const { data } = await db.from('giganet_accounts').select('*').order('created_at');
-  allAccounts = data || [];
+  allAccounts = await db.getAccounts() || [];
 }
 
 async function loadVisibleAccounts() {
   if (currentUser.role === 'admin') {
     visibleAccounts = allAccounts;
   } else {
-    const { data } = await db.from('user_accounts').select('account_id').eq('user_id', currentUser.id);
-    const ids = (data || []).map(r => r.account_id);
+    const ids = await db.getUserAccounts(currentUser.id) || [];
     visibleAccounts = allAccounts.filter(a => ids.includes(a.id));
   }
 }
 
 async function loadAppUsers() {
-  const { data } = await db.from('app_users').select('*').order('created_at');
-  allAppUsers = data || [];
+  allAppUsers = await db.getUsers() || [];
 }
 
 // ── SORT ──────────────────────────────────────────────────────────────────────
@@ -649,8 +694,8 @@ async function saveGigaNetAccount() {
   if (!username||!password){showToast('⚠️ Username and password required',true);return;}
   const btn=document.getElementById('acc-save-btn');
   btn.disabled=true;btn.textContent='Saving...';
-  if (editingAccId) await db.from('giganet_accounts').update({label,username,password}).eq('id',editingAccId);
-  else await db.from('giganet_accounts').insert({label,username,password});
+  if (editingAccId) await db.updateAccount(editingAccId, {label,username,password});
+  else await db.addAccount({label,username,password});
   btn.disabled=false;btn.textContent='💾 Save';
   closeModal('modal-acc');
   showToast(editingAccId?'✅ Account updated':'✅ Account added');
@@ -660,7 +705,7 @@ async function saveGigaNetAccount() {
 
 async function deleteGigaNetAccount(id) {
   if (!confirm('Delete this GigaNet account?')) return;
-  await db.from('giganet_accounts').delete().eq('id',id);
+  await db.deleteAccount(id);
   delete results[id];
   await loadAllAccounts(); await loadVisibleAccounts();
   renderAccList(); renderTable();
@@ -701,8 +746,8 @@ async function saveAppUser() {
   if (!email||!password){showToast('⚠️ Email and password required',true);return;}
   const btn=document.getElementById('user-save-btn');
   btn.disabled=true;btn.textContent='Saving...';
-  if (editingUserId) await db.from('app_users').update({name,email,password,role}).eq('id',editingUserId);
-  else await db.from('app_users').insert({name,email,password,role});
+  if (editingUserId) await db.updateUser(editingUserId, {name,email,password,role});
+  else await db.addUser({name,email,password,role});
   btn.disabled=false;btn.textContent='💾 Save';
   closeModal('modal-user');
   showToast(editingUserId?'✅ User updated':'✅ User added');
@@ -712,7 +757,7 @@ async function saveAppUser() {
 async function deleteAppUser(id) {
   if (id===currentUser.id){showToast('⚠️ Cannot delete yourself',true);return;}
   if (!confirm('Delete this user?')) return;
-  await db.from('app_users').delete().eq('id',id);
+  await db.deleteUser(id);
   await loadAppUsers(); renderUsersList();
   showToast('🗑️ User deleted');
 }
@@ -721,8 +766,7 @@ async function deleteAppUser(id) {
 async function openAssignModal(userId, userName) {
   assigningUserId = userId;
   document.getElementById('assign-title').textContent = '🔗 Assign Accounts to ' + userName;
-  const { data: existing } = await db.from('user_accounts').select('account_id').eq('user_id', userId);
-  const assigned = (existing||[]).map(r=>r.account_id);
+  const assigned = await db.getUserAccounts(userId) || [];
   document.getElementById('assign-list').innerHTML = allAccounts.map(acc=>`
     <div class="assign-item">
       <input type="checkbox" id="chk-${acc.id}" value="${acc.id}" ${assigned.includes(acc.id)?'checked':''}>
@@ -735,10 +779,7 @@ async function saveAssignments() {
   const btn=document.getElementById('assign-save-btn');
   btn.disabled=true;btn.textContent='Saving...';
   const checked = [...document.querySelectorAll('#assign-list input:checked')].map(c=>c.value);
-  await db.from('user_accounts').delete().eq('user_id',assigningUserId);
-  if (checked.length) {
-    await db.from('user_accounts').insert(checked.map(account_id=>({user_id:assigningUserId,account_id})));
-  }
+  await db.saveUserAccounts(assigningUserId, checked);
   btn.disabled=false;btn.textContent='💾 Save';
   closeModal('modal-assign');
   showToast('✅ Accounts assigned');
@@ -779,10 +820,9 @@ async function changePassword() {
 
   const btn = document.getElementById('cp-save-btn');
   btn.disabled = true; btn.textContent = 'Saving...';
-  const { error } = await db.from('app_users').update({ password: newPass }).eq('id', currentUser.id);
+  const result = await db.changePassword(currentUser.id, newPass);
   btn.disabled = false; btn.textContent = '💾 Update';
-
-  if (error) { errEl.textContent = 'Error updating password.'; errEl.style.display = 'block'; return; }
+  if (result.error) { errEl.textContent = 'Error updating password.'; errEl.style.display = 'block'; return; }
   currentUser.password = newPass;
   sessionStorage.setItem('giganet_user', JSON.stringify(currentUser));
   closeModal('modal-chpass');
