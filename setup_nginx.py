@@ -1,6 +1,4 @@
-import subprocess
-
-config = r"""server {
+config = """server {
     listen 443 ssl;
     server_name giganet.tvchurch.click;
     root /var/www/giganet/public;
@@ -9,7 +7,7 @@ config = r"""server {
     ssl_certificate_key /etc/letsencrypt/live/giganet.tvchurch.click/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-    location ~ \.php$ {
+    location ~ \\.php$ {
         fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
@@ -40,6 +38,10 @@ server {
 
 with open('/etc/nginx/sites-available/giganet', 'w') as f:
     f.write(config)
-print("Config written!")
+
+with open('/var/www/giganet/public/test.php', 'w') as f:
+    f.write('<?php echo "PHP OK"; ?>')
+
+import subprocess
 subprocess.run(['nginx', '-s', 'reload'])
-print("Done!")
+print("All done!")
